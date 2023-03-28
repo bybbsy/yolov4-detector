@@ -82,7 +82,7 @@ def distance_finder(focal_length, real_object_width, width_in_frmae):
     distance = (real_object_width * focal_length) / width_in_frmae
     return distance
 
-def run_video(name: str, width: float, distance: float):
+def run_video(name: str, width: float, distance: float, video_path: str):
     ref_image = cv.imread(f'ReferenceImages/{name}.jpg')
     image_data = object_detector(ref_image)
 
@@ -90,7 +90,7 @@ def run_video(name: str, width: float, distance: float):
 
     focal_length = focal_length_finder(distance, width, object_width_in_rf)
 
-    cap = cv.VideoCapture('video/cup.mp4')
+    cap = cv.VideoCapture(video_path)
 
     while True:
         ret, frame = cap.read()
