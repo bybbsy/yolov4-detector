@@ -2,11 +2,12 @@ import cv2 as cv
 import numpy as np
 
 # Distance constants 
-KNOWN_DISTANCE = 45 #INCHES
+KNOWN_DISTANCE = 8 #INCHES
 PERSON_WIDTH = 16 #INCHES
 MOBILE_WIDTH = 3.14 #INCHES
 STOP_SIGN_WIDTH = 30
 CAR_WIDTH= 5.8
+CUP_WIDTH = 3.5
 
 # Object detector constant 
 CONFIDENCE_THRESHOLD = 0.4
@@ -24,7 +25,7 @@ AWARENESS_COLORS = [(0, 0, 255), (0, 215, 255), (0,255,0)]
 # getting class names from classes.txt file 
 class_names = []
 recObjects = []
-classesToDetectIndexes = [0, 2, 11, 67]
+classesToDetectIndexes = [0, 2, 11, 67, 41]
 
 with open("classes.txt", "r") as f:
     class_names = [cname.strip() for cname in f.readlines()]
@@ -41,6 +42,15 @@ model.setInputParams(size=(416, 416), scale=1/255, swapRB=True)
 def formatInchToMeter(value):
     return value / 39.37
 
+def getColor(distance):
+    if distance < 25:
+        DISTANCE_TEXT_COLOR = AWARENESS_COLORS[0]
+    if distance < 50 and distance > 25:
+        DISTANCE_TEXT_COLOR = AWARENESS_COLORS[1]
+    if distance > 50:
+        DISTANCE_TEXT_COLOR = AWARENESS_COLORS[2]
+    return DISTANCE_TEXT_COLOR
+
 # object detector funciton /method
 def object_detector(image):
     
@@ -51,7 +61,7 @@ def object_detector(image):
     for (classid, score, box) in zip(classes, scores, boxes):
         # define color of each, object based on its class id 
         color= COLORS[int(classid) % len(COLORS)]
-    
+        print(classid)
         label = "%s : %f" % (class_names[classid], score)
 
         # draw rectangle on and label on object
@@ -62,7 +72,6 @@ def object_detector(image):
         print(className)
         if className not in recObjects:
             recObjects.append(className)
-
         # getting the data 
         # 1: class name  2: object width in pixels, 3: position where have to draw text(distance)
         if classid in classesToDetectIndexes: # person class id 
@@ -88,7 +97,8 @@ def distance_finder(focal_length, real_object_width, width_in_frmae):
 ref_person = cv.imread('ReferenceImages/image14.png')
 ref_mobile = cv.imread('ReferenceImages/image4.png')
 ref_stop_sign = cv.imread('ReferenceImages/STOP_sign.png')
-ref_car = cv.imread('ReferenceImages/audi.png')
+ref_book = cv.imread('ReferenceImages/cup.jpg')
+# ref_car = cv.imread('ReferenceImages/audi.png')
 
 mobile_data = object_detector(ref_mobile)
 mobile_width_in_rf = mobile_data['cell phone']['width']
@@ -99,9 +109,17 @@ person_width_in_rf = person_data['person']['width']
 stop_sign_data = object_detector(ref_stop_sign)
 stop_sign_width_in_rf = stop_sign_data['stop sign']['width']
 
-car_data = object_detector(ref_car)
-car_width_in_rf = car_data['car']['width']
-print(f"Person width in pixels : {person_width_in_rf}\nmobile width in pixel: {mobile_width_in_rf}\nstop sign width in pixel: {stop_sign_width_in_rf}")
+
+book_data = object_detector(ref_book)
+print(book_data)
+book_width_in_rf = book_data['cup']['width']
+
+# car_data = object_detector(ref_car)
+# car_width_in_rf = car_data['car']['width']
+
+# print(f"Person width in pixels : {person_width_in_rf}\nmobile width in pixel: {mobile_width_in_rf}\nstop sign width in pixel: {stop_sign_width_in_rf}")
+
+print(f"Book width: {book_width_in_rf}")
 
 # finding focal length 
 focal_person = focal_length_finder(KNOWN_DISTANCE, PERSON_WIDTH, person_width_in_rf)
@@ -110,9 +128,11 @@ focal_mobile = focal_length_finder(KNOWN_DISTANCE, MOBILE_WIDTH, mobile_width_in
 
 focal_stop_sign = focal_length_finder(KNOWN_DISTANCE, STOP_SIGN_WIDTH, stop_sign_width_in_rf)
 
-focal_car = focal_length_finder(KNOWN_DISTANCE, CAR_WIDTH, car_width_in_rf)
+focal_cup = focal_length_finder(KNOWN_DISTANCE, CUP_WIDTH, book_width_in_rf)
 
-cap = cv.VideoCapture(0)
+# focal_car = focal_length_finder(KNOWN_DISTANCE, CAR_WIDTH, car_width_in_rf)
+
+cap = cv.VideoCapture('video/cup.mp4')
 
 while True:
     ret, frame = cap.read()
@@ -135,31 +155,38 @@ while True:
     elif 'stop sign' in data:
         distance = distance_finder (focal_stop_sign, STOP_SIGN_WIDTH, data['stop sign']['width'])
         
-        if distance < 25:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[0]
-        if distance < 50 and distance > 25:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[1]
-        if distance > 50:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[2]
+        DISTANCE_TEXT_COLOR = getColor(distance)
 
         x, y = data['stop sign']['textPos']
     
         # cv.rectangle(frame, (x, y-3), (x+150, y+23),BLACK,-1 )
         cv.putText(frame, f'Расст: {round(formatInchToMeter(distance), 3)} м', (x+5,y+13), FONTS, 0.48, DISTANCE_TEXT_COLOR, FONT_THICKNESS)
-    elif 'car' in data:
-        distance = distance_finder (focal_car, CAR_WIDTH, data['car']['width'])
+    
+    elif 'cup' in data:
+        distance = distance_finder(focal_cup, CUP_WIDTH, data['cup']['width'])
         
-        if distance < 25:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[0]
-        if distance < 50 and distance > 25:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[1]
-        if distance > 50:
-            DISTANCE_TEXT_COLOR = AWARENESS_COLORS[2]
+        DISTANCE_TEXT_COLOR = getColor(distance)
 
-        x, y = data['car']['textPos']
+        x, y = data['cup']['textPos']
     
         # cv.rectangle(frame, (x, y-3), (x+150, y+23),BLACK,-1 )
         cv.putText(frame, f'Расст: {round(formatInchToMeter(distance), 3)} м', (x+5,y+13), FONTS, 0.48, DISTANCE_TEXT_COLOR, FONT_THICKNESS)
+   
+   
+    # elif 'car' in data:
+    #     distance = distance_finder (focal_car, CAR_WIDTH, data['car']['width'])
+        
+    #     if distance < 25:
+    #         DISTANCE_TEXT_COLOR = AWARENESS_COLORS[0]
+    #     if distance < 50 and distance > 25:
+    #         DISTANCE_TEXT_COLOR = AWARENESS_COLORS[1]
+    #     if distance > 50:
+    #         DISTANCE_TEXT_COLOR = AWARENESS_COLORS[2]
+
+    #     x, y = data['car']['textPos']
+    
+    #     # cv.rectangle(frame, (x, y-3), (x+150, y+23),BLACK,-1 )
+    #     cv.putText(frame, f'Расст: {round(formatInchToMeter(distance), 3)} м', (x+5,y+13), FONTS, 0.48, DISTANCE_TEXT_COLOR, FONT_THICKNESS)
 
     cv.imshow('frame',frame)
     
