@@ -39,6 +39,9 @@ model.setInputParams(size=(416, 416), scale=1/255, swapRB=True)
 def formatInchToMeter(value):
     return value / 39.37
 
+def formatMeterToInch(value):
+    return value * 39.37
+
 def getColor(distance):
     if distance < 25:
         DISTANCE_TEXT_COLOR = AWARENESS_COLORS[0]
@@ -57,21 +60,21 @@ def object_detector(image):
     for (classid, score, box) in zip(classes, scores, boxes):
         # define color of each, object based on its class id 
         color= COLORS[int(classid) % len(COLORS)]
-        label = "%s : %f" % (class_names[classid], score)
+        label = "%s : %f" % (class_names[classid[0]], score)
 
         # draw rectangle on and label on object
         cv.rectangle(image, box, color, 2)
         cv.putText(image, label, (box[0], box[1]-14), FONTS, 0.5, color, 2)
 
-        className = class_names[classid]
+        className = class_names[classid[0]]
         if className not in recObjects:
             recObjects.append(className)
 
-        if classid in classesToDetectIndexes: 
-            data_list[className] = {
-                'width': box[2],
-                'textPos': (box[0], box[1]-2)
-            } 
+        # if classid in classesToDetectIndexes: 
+        data_list[className] = {
+            'width': box[2],
+            'textPos': (box[0], box[1]-2)
+        } 
     return data_list
 
 def focal_length_finder (measured_distance, real_width, width_in_rf):
@@ -82,8 +85,10 @@ def distance_finder(focal_length, real_object_width, width_in_frmae):
     distance = (real_object_width * focal_length) / width_in_frmae
     return distance
 
-def run_video(name: str, width: float, distance: float, video_path: str):
-    ref_image = cv.imread(f'ReferenceImages/{name}.jpg')
+
+
+def run_video(name: str, width: float, distance: float, img_path: str, video_path: str):
+    ref_image = cv.imread(img_path)
     image_data = object_detector(ref_image)
 
     object_width_in_rf = image_data[name]['width']
@@ -91,19 +96,22 @@ def run_video(name: str, width: float, distance: float, video_path: str):
     focal_length = focal_length_finder(distance, width, object_width_in_rf)
 
     cap = cv.VideoCapture(video_path)
+    
 
+    # cap = cv.resize(cap_raw, (300, 300))
     while True:
         ret, frame = cap.read()
-        
-        cv.putText(
-            frame,
-            f'Dis: {round(100,2)} inch',
-            (20+5, 10+13),
-            FONTS,
-            0.3,
-            GREEN,
-            1
-        )
+        # frame = cv.resize(f, (270, 480))
+
+        # cv.putText(
+        #     frame,
+        #     f'Dis: {round(100,2)} inch',
+        #     (20+5, 10+13),
+        #     FONTS,
+        #     0.3,
+        #     GREEN,
+        #     1
+        # )
 
         data = object_detector(frame)
 
@@ -129,6 +137,8 @@ def run_video(name: str, width: float, distance: float, video_path: str):
         if key == ord('q'):
             print(recObjects)
             break
+        if key == ord('p'):
+            cv.waitKey(-1)
 
     cv.destroyAllWindows()
     cap.release()
